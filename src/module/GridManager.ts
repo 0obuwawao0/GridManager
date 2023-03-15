@@ -64,6 +64,8 @@ import autoPlay from './autoPlay';
 import { showRow, hideRow } from './rowVisible';
 import { Column, ArgColumn, SettingObj, JTool, ArgObj, SortData, Row } from 'typings/types';
 
+export {getSettings, setSettings};
+
 const isRendered = (_: string, settings?: SettingObj): boolean => {
     // 部分静态方法自身不使用settings， 所以这个参数可能为空
     if (!settings) {

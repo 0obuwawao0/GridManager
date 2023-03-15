@@ -128,6 +128,7 @@ const index = new Vue({
         option: {
             supportRemind: true,
             gridManagerName: 'test',
+			firstLoading: true,
             height: '100%',
             supportAjaxPage: true,
             supportSorting: true,
@@ -364,5 +365,8 @@ const index = new Vue({
     // 创建完成
     created: function () {
         this.destroyDisabled = false;
-    }
+    },
+	mounted() {
+		//$gridManager.refreshGrid(this.option.gridManagerName)
+	}
 });

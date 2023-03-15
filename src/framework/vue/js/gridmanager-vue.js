@@ -190,7 +190,7 @@ export default {
 		 * @param thName or thNameList
 		 */
 		hideTh(thName) {
-			$gridManager.showTh(this.option.gridManagerName, thName);
+			$gridManager.hideTh(this.option.gridManagerName, thName);
 		},
 		/**
 		 * 导出.xls格式文件
@@ -222,16 +222,28 @@ export default {
 		 * @param callback: 回调函数
 		 */
 		setAjaxData(ajaxData, callback) {
+			if (ajaxData instanceof Array) {
+				// 目前如果通过该方法放入数据的话一定要包装一个 data，所以这里只要是数组，就默认包裹
+				ajaxData = {data: ajaxData};
+			}
+			const {checkboxConfig} = this.option;
+			if  (!checkboxConfig ||
+				checkboxConfig.disableStateKeep) {
+				this.setCheckedData([]);
+			}
 			$gridManager.setAjaxData(this.option.gridManagerName, ajaxData, callback);
 		},
 		/**
-		 * 刷新表格 使用现有参数重新获取数据，对表格数据区域进行渲染
+		 * 刷新表格 使用现有参数重新获取数据，对表格数据区域进行渲染，刷新时清空用户选择
 		 * @param isGotoFirstPage:  是否刷新时跳转至第一页[boolean类型, 默认true]
 		 * @param callback: 回调函数
 		 */
 		refreshGrid(isGotoFirstPage = true, callback) {
-			// 刷新时清理选择的记录
-			$gridManager.setCheckedData(this.option.gridManagerName, []);
+			const {checkboxConfig} = this.option;
+			if  (!checkboxConfig ||
+				checkboxConfig.disableStateKeep) {
+				this.setCheckedData([]);
+			}
 			$gridManager.refreshGrid(this.option.gridManagerName, isGotoFirstPage, callback);
 		},
 		/**
@@ -264,7 +276,121 @@ export default {
 		 */
 		updateRowData(key, rowData) {
 			return $gridManager.updateRowData(this.option.gridManagerName, key, rowData);
+		},
+		/**
+		 * 重新渲染,但目前在 firstloding为false时 需要先init表格
+		 * @param columnData
+		 * @returns {Promise<void>}
+		 */
+		renderGrid(columnData) {
+			return $gridManager.renderGrid(this.option.gridManagerName, columnData);
+		},
+		/**
+		 * 初始化表格
+		 * @param callback
+		 */
+		init(callback) {
+			$gridManager.destroy(this.option.gridManagerName);
+			this.option.firstLoading = true;
+			if (this.option.ajaxData instanceof Array) {
+				this.option.ajaxData = {data: this.option.ajaxData};
+			}
+			new $gridManager(this.$el, this.option, query => {
+				typeof (callback) === 'function' && callback(query);
+			});
+		},
+		/**
+		 * 获取Table 对应 GridManager的实例
+		 * @returns {SettingObj}
+		 */
+		get() {
+			return $gridManager.get(this.option.gridManagerName);
+		},
+		/**
+		 * 更新树的展开状态
+		 * @param state
+		 */
+		updateTreeState(state) {
+			return $gridManager.updateTreeState(this.option.gridManagerName, state);
+		},
+		/**
+		 * 清空表格数据
+		 * @returns {*|void}
+		 */
+		cleanData() {
+			const {checkboxConfig} = this.option;
+			if  (!checkboxConfig ||
+			checkboxConfig.disableStateKeep) {
+				this.setCheckedData([]);
+			}
+			return $gridManager.cleanData(this.option.gridManagerName);
+		},
+		/**
+		 * 打印
+		 */
+		print() {
+			return $gridManager.print(this.option.gridManagerName);
+		},
+		/**
+		 * 显示加载框
+		 */
+		showLoading() {
+			return $gridManager.showLoading(this.option.gridManagerName);
+		},
+		/**
+		 * 隐藏加载框
+		 * @param delayTime: 延迟隐藏时间
+		 */
+		hideLoading(delayTime) {
+			return $gridManager.hideLoading(this.option.gridManagerName);
+		},
+		/**
+		 * 显示行
+		 * @param index: 行的索引，为空时将显示所有已隐藏的行
+		 */
+		showRow(index) {
+			return $gridManager.showRow(this.option.gridManagerName, index);
+		},
+		/**
+		 * 隐藏行
+		 * @param index: 行的索引，为空时将不执行
+		 */
+		hideRow(index) {
+			return $gridManager.hideRow(this.option.gridManagerName, index);
+		},
+		/**
+		 * 设置行高度 v2.17.0
+		 * @param height
+		 */
+		setLineHeight(height) {
+			return $gridManager.setLineHeight(this.option.gridManagerName, height);
+		},
+		/**
+		 * 启用自动轮播
+		 */
+		startAutoPlay() {
+			return $gridManager.startAutoPlay(this.option.gridManagerName);
+		},
+		/**
+		 * 停止自动轮播
+		 */
+		stopAutoPlay() {
+			return $gridManager.stopAutoPlay(this.option.gridManagerName);
+		},
+		/**
+		 * 消毁当前实例
+		 */
+		destroy() {
+			return $gridManager.destroy(this.option.gridManagerName);
+		},
+		/**
+		 * 列表已存在时，返回rendered的值
+		 * @returns {any}
+		 */
+		isRendered() {
+			return $gridManager.get(this.option.gridManagerName).rendered || false;
 		}
+
 	},
 
     /**
@@ -281,7 +407,7 @@ export default {
     activated() {
         const settings = $gridManager.get(this.option.gridManagerName);
         if (settings.rendered) {
-            $gridManager.resetLayout(this.option.gridManagerName, settings.width, settings.height);
+            $gridManager.resetLayout(settings.gridManagerName, settings.width, settings.height);
         }
     }
 };

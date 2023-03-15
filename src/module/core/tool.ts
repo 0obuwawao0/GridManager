@@ -14,7 +14,7 @@ import { TR_CACHE_KEY } from '@common/constants';
 
 // 获取参数信息
 export const getParams = (settings: SettingObj): object => {
-    const { query, supportAjaxPage, pageData, sortData, mergeSort, sortKey, currentPageKey, pageSizeKey, requestHandler } = settings;
+    const { query, supportAjaxPage, pageData, sortData, mergeSort, sortKey, sortOrderKey, currentPageKey, pageSizeKey, requestHandler } = settings;
     const params = extend(true, {}, query);
     // 合并分页信息至请求参
     if (supportAjaxPage) {
@@ -24,19 +24,32 @@ export const getParams = (settings: SettingObj): object => {
 
     // 合并排序信息至请求参, 排序数据为空时则忽略
     if (!isEmptyObject(sortData)) {
+
+		// settings.sortOrderKey: 当配置有值时，排序字段为拆分模式
+		// settings.mergeSort 将不再影响排序字段的格式失效
+		if (sortOrderKey) {
+			each(sortData, (key: string, value: string) => {
+				// {sortKey:key , sortOrderKey: value}
+				params[sortKey] = key;
+				params[sortOrderKey] = value;
+			});
+		}
         // #001
         // settings.mergeSort: 是否合并排序字段
-        if (mergeSort) {
+        if (!sortOrderKey && mergeSort) {
             params[sortKey] = '';
             each(sortData, (key: string, value: string) => {
-                params[sortKey] = `${params[sortKey]}${params[sortKey] ? ',' : ''}${key}:${value}`;
-            });
-        } else {
-            each(sortData, (key: string, value: string) => {
-                // 增加sort_前缀,防止与搜索时的条件重叠
-                params[`${sortKey}${key}`] = value;
+				// {sortKey: 'key:value'}
+				params[sortKey] = `${params[sortKey]}${params[sortKey] ? ',' : ''}${key}:${value}`;
             });
         }
+		if (!sortOrderKey && !mergeSort) {
+			each(sortData, (key: string, value: string) => {
+				// 增加sort_前缀,防止与搜索时的条件重叠
+				// {sortKey_key:value}
+				params[`${sortKey}${key}`] = value;
+			});
+		}
     }
 
     // 请求前处理程序, 可以通过该方法增加 或 修改全部的请求参数
