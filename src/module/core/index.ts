@@ -19,7 +19,7 @@ import {
 	getTbody,
 	getThead
 } from '@common/base';
-import { cloneObject, outError } from '@common/utils';
+import {cloneObject, outError, outWarn} from '@common/utils';
 import {
 	getTableData,
 	setTableData,
@@ -367,8 +367,10 @@ class Core {
 
         // 数据校验: 数据异常
         if (!_data || !isArray(_data)) {
-            outError(`response.${dataKey} is not Array，please check dataKey`);
-            return;
+			// 不需要提示，异常给空列表
+			// outWarn(`response.${dataKey} is not Array，please check dataKey or data null`);
+			_data = [];
+            // return;
         }
 
         // 数据校验: 未使用无总条数模式 && 未使用异步总页 && 总条数无效时直接跳出

@@ -239,7 +239,7 @@ const index = new Vue({
                     text: '简介'
                 }, {
                     key: 'readNumber',
-                    text: 'readNumber',
+                    text: 'readNumber'
                 }, {
                     key: 'username',
                     remind: 'the username',

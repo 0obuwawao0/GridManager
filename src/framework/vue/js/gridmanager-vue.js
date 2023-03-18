@@ -223,8 +223,11 @@ export default {
 		 */
 		setAjaxData(ajaxData, callback) {
 			if (ajaxData instanceof Array) {
+			   const { dataKey } = this.get();
 				// 目前如果通过该方法放入数据的话一定要包装一个 data，所以这里只要是数组，就默认包裹
-				ajaxData = {data: ajaxData};
+				ajaxData = {
+					[dataKey]: ajaxData
+				};
 			}
 			const {checkboxConfig} = this.option;
 			if  (!checkboxConfig ||
@@ -292,9 +295,6 @@ export default {
 		init(callback) {
 			$gridManager.destroy(this.option.gridManagerName);
 			this.option.firstLoading = true;
-			if (this.option.ajaxData instanceof Array) {
-				this.option.ajaxData = {data: this.option.ajaxData};
-			}
 			new $gridManager(this.$el, this.option, query => {
 				typeof (callback) === 'function' && callback(query);
 			});

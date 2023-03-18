@@ -163,6 +163,13 @@ export default class GridManager {
             return;
         }
 
+		// 当只设置一个空数组时转成默认格式
+		if (arg.ajaxData instanceof Array) {
+			arg.ajaxData = {
+				[arg.dataKey]: arg.ajaxData
+			};
+		}
+
         // 相互冲突的参数项处理: 通栏
         if (isObject(arg.fullColumn) && (isFunction(arg.fullColumn.topTemplate) || isFunction(arg.fullColumn.bottomTemplate))) {
             // 不使用配置功能
