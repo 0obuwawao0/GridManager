@@ -1,395 +1,396 @@
-import { getRowData, getTableData } from '@common/cache';
-import {
-	getDiv,
-	getEmpty, getFakeThead,
-	getTbody,
-	getThead,
-	getVisibleTh,
-	setAreVisible,
-	updateVisibleLast
-} from '@common/base';
-import {
-	EMPTY_DATA_CLASS_NAME,
-	EMPTY_TPL_KEY,
-	ODD,
-	PX,
-	ROW_CLASS_NAME,
-	TR_CACHE_KEY,
-	TR_CHILDREN_STATE,
-	TR_PARENT_KEY,
-	TR_ROW_KEY,
-	ROW_INDEX_KEY
-} from '@common/constants';
-import {each, isElement, isNumber, isUndefined, isValidArray} from '@jTool/utils';
-import {compileEmptyTemplate, compileFakeThead, compileTd, sendCompile} from '@common/framework';
-import { outError } from '@common/utils';
-import moveRow from '@module/moveRow';
-import checkbox from '@module/checkbox';
-import fullColumn, { getFullColumnTr, getFullColumnInterval } from '@module/fullColumn';
-import tree from '@module/tree';
-import { treeElementKey } from '@module/tree/tool';
-import { installSummary } from '@module/summary';
-import { mergeRow } from '@module/merge';
-import fixed from '@module/fixed';
-import template from './template';
-import nested from '@module/nested';
-import { SettingObj, Column, TrObject, Row } from 'typings/types';
-
-/**
- * é‡ç»˜thead
- * @param settings
- */
-export const renderThead = async (settings: SettingObj): Promise<void> => {
-	const { _, columnMap, __isNested } = settings;
-
-	const columnList: Array<Array<Column>> = [[]];
-	const topList = columnList[0];
-
-	// å¤šå±‚åµŒå¥—ï¼Œè¿›è¡Œé€’å½’å¤„ç†
-	if (__isNested) {
-		nested.push(columnMap, columnList);
-	} else {
-		each(columnMap, (key: string, col: Column) => {
-			topList[col.index] = col;
-		});
-	}
-
-	let thListTpl = '';
-	// columnList ç”Ÿæˆthead
-	each(columnList, (list: Array<Column>) => {
-		thListTpl += '<tr>';
-		each(list, (col: Column) => {
-			thListTpl += template.getThTpl({settings, col});
-		});
-		thListTpl += '</tr>';
-	});
-	getThead(_).html(thListTpl);
-	getFakeThead(_).html(thListTpl);
-
-	compileFakeThead(settings, getFakeThead(_).get(0));
-
-	// è§£ææ¡†æ¶: theadåŒºåŸŸ
-	await sendCompile(settings);
-};
-/**
- * æ¸²æŸ“ä¸ºç©ºDOM
- * @param settings
- * @param isInit
- */
-export const renderEmptyTbody = (settings: SettingObj, isInit?: boolean): void => {
-	const { _, emptyTemplate } = settings;
-	// å½“å‰ä¸ºç¬¬ä¸€æ¬¡åŠ è½½ ä¸” å·²ç»æ‰§è¡Œè¿‡setQuery æ—¶ï¼Œä¸å†æ’å…¥ç©ºæ•°æ®æ¨¡æ¿
-	// ç”¨äºè§£å†³å®¹å™¨ä¸ºä¸å¯è§æ—¶ï¼Œè§¦å‘äº†setQueryçš„æƒ…å†µ
-	if (isInit && getTableData(_, true).length !== 0) {
-		return;
-	}
-
-	const $tableDiv = getDiv(_);
-	$tableDiv.addClass(EMPTY_DATA_CLASS_NAME);
-	getTbody(_).html(`<tr ${EMPTY_TPL_KEY}="${_}" style="height: ${$tableDiv.height() - 1 + PX}"><td colspan="${getVisibleTh(_).length}"></td></tr>`);
-	const emptyTd = getEmpty(_).get(0).querySelector('td');
-
-	emptyTd.innerHTML = compileEmptyTemplate(settings, emptyTd, emptyTemplate);
-
-	// è§£ææ¡†æ¶: ç©ºæ¨¡æ¿
-	sendCompile(settings);
-};
-
-/**
- * é‡æ–°ç»„è£…table body: è¿™ä¸ªæ–¹æ³•æœ€å¤§çš„æ€§èƒ½é—®é¢˜åœ¨äºtbodyè¿‡å¤§æ—¶ï¼Œé¦–æ¬¡è·å–tbodyæˆ–å…¶çˆ¶å®¹å™¨æ—¶è¿‡æ…¢
- * @param settings
- * @param bodyList
- * @param isVirtualScroll: å½“å‰æ˜¯å¦ä¸ºè™šæ‹Ÿæ»šåŠ¨
- * @param firstTrCacheKey
- * @param lastTrCacheKey
- */
-export const renderTbody = async (settings: SettingObj, bodyList: Array<Row>, isVirtualScroll: boolean, firstTrCacheKey: string, lastTrCacheKey: string): Promise<any> => {
-	const {
-		_,
-		columnMap,
-		supportTreeData,
-		supportCheckbox,
-		supportMoveRow,
-		treeConfig,
-		__isNested,
-		__isFullColumn
-	} = settings;
-
-	const { treeKey, openState } = treeConfig;
-
-	// tbody dom
-	const $tbody = getTbody(_);
-	const tbody = $tbody.get(0);
-
-	// æ¸…é™¤æ•°æ®ä¸ºç©ºæ—¶çš„dom
-	const $emptyTr = $tbody.find(`[${EMPTY_TPL_KEY}="${_}"]`);
-	if ($emptyTr.length) {
-		$emptyTr.remove();
-	}
-
-	// å­˜å‚¨trå¯¹åƒåˆ—è¡¨
-	let trObjectList: Array<TrObject> = [];
-
-	// é€šè¿‡indexå¯¹columnMapè¿›è¡Œæ’åº
-	const topList: Array<Column> = [];
-	const columnList: Array<Column> = [];
-	each(columnMap, (key: string, col: Column) => {
-		if (!col.pk) {
-			topList[col.index] = col;
-		}
-	});
-
-	const pushList = (list: Array<Column>) => {
-		each(list, (col: Column) => {
-			if (!isValidArray(col.children)) {
-				columnList.push(col);
-				return;
-			}
-			pushList(col.children);
-		});
-	};
-	pushList(topList);
-
-	// æ’å…¥å¸¸è§„çš„TR
-	const installNormal = (trObject: TrObject, row: Row, rowIndex: number, isTop: boolean): void => {
-		// ä¸å½“å‰ä½ç½®ä¿¡æ¯åŒ¹é…çš„tdåˆ—è¡¨
-
-		const tdList = trObject.tdList;
-		each(columnList, (col: Column) => {
-			const tdTemplate = col.template;
-			if (col.isAutoCreate) {
-				tdList.push(tdTemplate(row[col.key], row, rowIndex, isTop));
-				return;
-			}
-
-			let { text, compileAttr } = compileTd(settings, tdTemplate, row, rowIndex, col.key);
-			const alignAttr = col.align ? `align=${col.align}` : '';
-			const moveRowAttr = supportMoveRow ? moveRow.addSign(col) : '';
-			const useRowCheckAttr = supportCheckbox ? checkbox.addSign(col) : '';
-			const fixedAttr = col.fixed ? `fixed=${col.fixed}` : '';
-			const colClassAttr = col.columnClass ? `class=${col.columnClass}` : '';
-			text = isElement(text) ? text.outerHTML : text;
-			tdList.push(`<td ${compileAttr} ${alignAttr} ${moveRowAttr} ${useRowCheckAttr} ${fixedAttr} ${colClassAttr}>${text}</td>`);
-		});
-	};
-
-	try {
-		const installTr = (list: Array<Row>, level: number, pIndex?: string): void => {
-			const isTop = isUndefined(pIndex);
-			each(list, (row: Row, index: number) => {
-				const className = [];
-				const attribute = [];
-				const tdList: Array<string> = [];
-				const cacheKey = row[TR_CACHE_KEY];
-
-				// å¢åŠ è¡Œ class name
-				if (row[ROW_CLASS_NAME]) {
-					className.push(row[ROW_CLASS_NAME]);
-				}
-
-				// éé¡¶å±‚
-				if (!isTop) {
-					attribute.push([TR_PARENT_KEY, pIndex]);
-					// å¤„ç†å±•å¼€çŠ¶æ€: å½“å‰å­˜åœ¨trä½¿ç”¨trå½“å‰çš„çŠ¶æ€ï¼Œå¦‚ä¸å­˜åœ¨ä½¿ç”¨tree configä¸­çš„é…ç½®é¡¹
-					const _tr = tbody.querySelector(`[${TR_CACHE_KEY}="${cacheKey}"]`);
-					let _openState = openState;
-					if (_tr) {
-						_openState = _tr.getAttribute(TR_CHILDREN_STATE) === 'true';
-					}
-					attribute.push([TR_CHILDREN_STATE, _openState]);
-				}
-
-				// é¡¶å±‚ ä¸”å½“å‰ä¸ºæ ‘å½¢ç»“æ„
-				if (isTop && supportTreeData) {
-					// ä¸ç›´æ¥ä½¿ç”¨css oddæ˜¯ç”±äºå­˜åœ¨å±‚çº§æ•°æ®æ—¶æ— æ³•æ’é™¤æŠ˜å å…ƒç´ 
-					index % 2 === 0 && attribute.push([ODD, '']);
-				}
-
-				attribute.push([TR_CACHE_KEY, cacheKey]);
-
-				const trObject: TrObject = {
-					className,
-					attribute,
-					row,
-					querySelector: `[${TR_CACHE_KEY}="${cacheKey}"]`,
-					tdList
-				};
-
-				// é¡¶å±‚ç»“æ„: é€šæ -top
-				if (isTop && __isFullColumn) {
-					fullColumn.addTop(settings, row, index, trObjectList);
-				}
-
-				// æ’å…¥æ­£å¸¸çš„TR
-				installNormal(trObject, row, index, isTop);
-
-				trObjectList.push(trObject);
-
-				// é¡¶å±‚ç»“æ„: é€šæ -bottom
-				if (isTop && __isFullColumn) {
-					fullColumn.addBottom(settings, row, index, trObjectList);
-				}
-
-				// å¤„ç†å±‚çº§ç»“æ„
-				if (supportTreeData) {
-					const children = row[treeKey];
-					const hasChildren = children && children.length;
-
-					// å½“å‰ä¸ºæ›´æ–°æ—¶ï¼Œä¿ç•™åŸçŠ¶æ€
-					let state;
-					const $treeElement = $tbody.find(`${trObject.querySelector} [${treeElementKey}]`);
-					if ($treeElement.length) {
-						state = $treeElement.attr(treeElementKey) === 'true';
-					}
-
-					// æ·»åŠ tree map
-					tree.add(_, cacheKey, level, hasChildren, state);
-
-					// é€’å½’å¤„ç†å±‚æç»“æ„
-					if (hasChildren) {
-						installTr(children, level + 1, cacheKey);
-					}
-				}
-			});
-		};
-
-		installTr(bodyList, 0);
-
-		// æ’å…¥æ±‡æ€»è¡Œ: éªŒè¯åœ¨å‡½æ•°å†…
-		installSummary(settings, columnList, trObjectList);
-
-		const prependFragment = document.createDocumentFragment();
-
-		const df = document.createDocumentFragment();
-		const $tr = $tbody.find('tr');
-		each($tr, (item: HTMLTableRowElement) => {
-			df.appendChild(item);
-		});
-		tbody.innerHTML = '';
-
-		// æ¸…é™¤ä¸æ•°æ®ä¸åŒ¹é…çš„tr
-		if (df.children.length) {
-			let firstLineIndex: number;
-			let lastLineIndex: number;
-
-			// å¤„ç†å¼€å§‹è¡Œ: éœ€è¦éªŒè¯ä¸Šé€šæ è¡Œ
-			let firstTr = getFullColumnTr(df, 'top', firstTrCacheKey);
-			if (!firstTr) {
-				firstTr = df.querySelector(`[${TR_CACHE_KEY}="${firstTrCacheKey}"]`);
-			}
-			if (firstTr) {
-				firstLineIndex = [].indexOf.call(df.children, firstTr);
-			}
-
-			// å¤„ç†ç»“æŸè¡Œ: éœ€è¦éªŒè¯åˆ†å‰²è¡Œ
-			let lastTr = getFullColumnInterval(df, lastTrCacheKey);
-			if (!lastTr) {
-				lastTr = df.querySelector(`[${TR_CACHE_KEY}="${lastTrCacheKey}"]`);
-			}
-			if (lastTr) {
-				lastLineIndex = [].indexOf.call(df.children, lastTr);
-			}
-
-			const list: Array<HTMLTableRowElement> = [];
-			each(df.children, (item: HTMLTableRowElement, index: number) => {
-				// DOMä¸­ä¸å­˜åœ¨å¼€å§‹è¡Œä¸ç»“æŸè¡Œçš„tr: æ¸…ç©ºæ‰€æœ‰tr
-				if (!isNumber(firstLineIndex) && !isNumber(lastLineIndex)) {
-					list.push(item);
-					return;
-				}
-
-				// DOMä¸­å­˜åœ¨å¼€å§‹è¡Œçš„tr: æ¸…ç©ºå°äºå¼€å§‹çš„tr
-				if (isNumber(firstLineIndex) && index < firstLineIndex) {
-					list.push(item);
-				}
-
-				// DOMä¸­å­˜åœ¨ç»“æŸè¡Œçš„tr: æ¸…ç©ºå¤§äºç»“æŸè¡Œçš„tr
-				if (isNumber(lastLineIndex) && index > lastLineIndex) {
-					list.push(item);
-				}
-			});
-			each(list, (item: HTMLTableRowElement) => item.remove());
-		}
-		trObjectList.forEach(item => {
-			const { className, attribute, tdList, row, querySelector } = item;
-			const tdStr = tdList.join('');
-
-			// å·®å¼‚åŒ–æ›´æ–°
-			// é€šè¿‡domèŠ‚ç‚¹ä¸Šçš„å±æ€§åæŸ¥dom
-			let tr = df.querySelector(querySelector);
-
-			// å½“å‰å·²å­˜åœ¨tr
-			if (tr) {
-				tr.innerHTML = tdStr;
-			} else {
-				// å½“å‰ä¸å­˜åœ¨tr
-				tr = document.createElement('tr');
-				tr.innerHTML = tdStr;
-
-				const firstCacheTr = df.querySelector(`[${TR_CACHE_KEY}]`) as HTMLTableRowElement;
-				if (firstCacheTr && !isUndefined(row)) {
-					const firstNum = getRowData(_, firstCacheTr, true)[ROW_INDEX_KEY];
-					const nowNum = row[ROW_INDEX_KEY];
-					if (nowNum < firstNum) {
-						prependFragment.appendChild(tr);
-					} else {
-						df.appendChild(tr);
-					}
-				} else {
-					df.appendChild(tr);
-				}
-			}
-
-			// ä¸ºæ–°å¢æˆ–ä¿®æ”¹åçš„Træ›´æ–°[class, attribute]
-			if (className.length) {
-				tr.className = className.join(' ');
-			}
-			attribute.forEach(attr => {
-				tr.setAttribute(attr[0], attr[1]);
-			});
-			// å°†æ•°æ®æŒ‚è½½è‡³DOM
-			tr[TR_ROW_KEY] = row;
-		});
-
-		df.insertBefore(prependFragment, df.firstChild);
-
-		tbody.appendChild(df);
-	} catch (e) {
-		outError('render tbody error');
-		console.error(e);
-	}
-
-	// éå¤šå±‚åµŒå¥—åˆå§‹åŒ–æ˜¾ç¤ºçŠ¶æ€: å¤šå±‚åµŒå¥—ä¸æ”¯æŒæ˜¾ç¤ºã€éšè—æ“ä½œ
-	if (!__isNested) {
-		each(columnMap, (key: string, col: Column) => {
-			setAreVisible(_, key, col.isShow);
-		});
-	}
-
-	// è§£ææ¡†æ¶
-	await sendCompile(settings);
-
-	// æ’å…¥tree dom
-	supportTreeData && tree.insertDOM(_, treeConfig);
-
-	// åˆå¹¶å•å…ƒæ ¼
-	mergeRow(_, columnMap);
-
-	// è™šæ‹Ÿæ»šåŠ¨æ— éœ€æ‰§è¡Œä»¥åé€»è¾‘
-	if (!isVirtualScroll) {
-		fixed.update(_);
-
-		// å¢åŠ tbodyæ˜¯å¦å¡«å……æ»¡æ ‡è¯†
-		if ($tbody.height() >= getDiv(_).height()) {
-			$tbody.attr('filled', '');
-		} else {
-			$tbody.removeAttr('filled');
-		}
-
-		// ä¸ºæœ€åä¸€åˆ—çš„th, tdå¢åŠ æ ‡è¯†: åµŒå¥—è¡¨å¤´ä¸å¤„ç†
-		if (!settings.__isNested) {
-			updateVisibleLast(_);
-		}
-	}
-
-};
+import { getRowData, getTableData } from '@common/cache';
+import {
+	getDiv,
+	getEmpty, getFakeThead,
+	getTbody,
+	getThead,
+	getVisibleTh,
+	setAreVisible,
+	updateVisibleLast
+} from '@common/base';
+import {
+	EMPTY_DATA_CLASS_NAME,
+	EMPTY_TPL_KEY,
+	ODD,
+	PX,
+	ROW_CLASS_NAME,
+	TR_CACHE_KEY,
+	TR_CHILDREN_STATE,
+	TR_PARENT_KEY,
+	TR_ROW_KEY,
+	ROW_INDEX_KEY
+} from '@common/constants';
+import {each, isElement, isNumber, isUndefined, isValidArray} from '@jTool/utils';
+import {compileEmptyTemplate, compileFakeThead, compileTd, sendCompile} from '@common/framework';
+import { outError } from '@common/utils';
+import moveRow from '@module/moveRow';
+import checkbox from '@module/checkbox';
+import fullColumn, { getFullColumnTr, getFullColumnInterval } from '@module/fullColumn';
+import tree from '@module/tree';
+import { treeElementKey } from '@module/tree/tool';
+import { installSummary } from '@module/summary';
+import { mergeRow } from '@module/merge';
+import fixed from '@module/fixed';
+import template from './template';
+import nested from '@module/nested';
+import { SettingObj, Column, TrObject, Row } from 'typings/types';
+
+/**
+ * ÖØ»æthead
+ * @param settings
+ */
+export const renderThead = async (settings: SettingObj): Promise<void> => {
+	const { _, columnMap, __isNested } = settings;
+
+	const columnList: Array<Array<Column>> = [[]];
+	const topList = columnList[0];
+
+	// ¶à²ãÇ¶Ì×£¬½øĞĞµİ¹é´¦Àí
+	if (__isNested) {
+		nested.push(columnMap, columnList);
+	} else {
+		each(columnMap, (key: string, col: Column) => {
+			topList[col.index] = col;
+		});
+	}
+
+	let thListTpl = '';
+	// columnList Éú³Éthead
+	each(columnList, (list: Array<Column>) => {
+		thListTpl += '<tr>';
+		each(list, (col: Column) => {
+			thListTpl += template.getThTpl({settings, col});
+		});
+		thListTpl += '</tr>';
+	});
+	getThead(_).html(thListTpl);
+	getFakeThead(_).html(thListTpl);
+
+	compileFakeThead(settings, getFakeThead(_).get(0));
+
+	// ½âÎö¿ò¼Ü: theadÇøÓò
+	await sendCompile(settings);
+};
+/**
+ * äÖÈ¾Îª¿ÕDOM
+ * @param settings
+ * @param isInit
+ */
+export const renderEmptyTbody = (settings: SettingObj, isInit?: boolean): void => {
+	const { _, emptyTemplate } = settings;
+	// µ±Ç°ÎªµÚÒ»´Î¼ÓÔØ ÇÒ ÒÑ¾­Ö´ĞĞ¹ısetQuery Ê±£¬²»ÔÙ²åÈë¿ÕÊı¾İÄ£°å
+	// ÓÃÓÚ½â¾öÈİÆ÷Îª²»¿É¼ûÊ±£¬´¥·¢ÁËsetQueryµÄÇé¿ö
+	if (isInit && getTableData(_, true).length !== 0) {
+		return;
+	}
+
+	const $tableDiv = getDiv(_);
+	$tableDiv.addClass(EMPTY_DATA_CLASS_NAME);
+	getTbody(_).html(`<tr ${EMPTY_TPL_KEY}="${_}" style="height: ${$tableDiv.height() - 1 + PX}"><td colspan="${getVisibleTh(_).length}"></td></tr>`);
+	const emptyTd = getEmpty(_).get(0).querySelector('td');
+
+	emptyTd.innerHTML = compileEmptyTemplate(settings, emptyTd, emptyTemplate);
+
+	// ½âÎö¿ò¼Ü: ¿ÕÄ£°å
+	sendCompile(settings);
+};
+
+/**
+ * ÖØĞÂ×é×°table body: Õâ¸ö·½·¨×î´óµÄĞÔÄÜÎÊÌâÔÚÓÚtbody¹ı´óÊ±£¬Ê×´Î»ñÈ¡tbody»òÆä¸¸ÈİÆ÷Ê±¹ıÂı
+ * @param settings
+ * @param bodyList
+ * @param isVirtualScroll: µ±Ç°ÊÇ·ñÎªĞéÄâ¹ö¶¯
+ * @param firstTrCacheKey
+ * @param lastTrCacheKey
+ */
+export const renderTbody = async (settings: SettingObj, bodyList: Array<Row>, isVirtualScroll: boolean, firstTrCacheKey: string, lastTrCacheKey: string): Promise<any> => {
+	const {
+		_,
+		columnMap,
+		supportTreeData,
+		supportCheckbox,
+		supportMoveRow,
+		treeConfig,
+		__isNested,
+		__isFullColumn
+	} = settings;
+
+	const { treeKey, openState } = treeConfig;
+
+	// tbody dom
+	const $tbody = getTbody(_);
+	const tbody = $tbody.get(0);
+
+	// Çå³ıÊı¾İÎª¿ÕÊ±µÄdom
+	const $emptyTr = $tbody.find(`[${EMPTY_TPL_KEY}="${_}"]`);
+	if ($emptyTr.length) {
+		$emptyTr.remove();
+	}
+
+	// ´æ´¢tr¶ÔÏñÁĞ±í
+	let trObjectList: Array<TrObject> = [];
+
+	// Í¨¹ıindex¶ÔcolumnMap½øĞĞÅÅĞò
+	const topList: Array<Column> = [];
+	const columnList: Array<Column> = [];
+	each(columnMap, (key: string, col: Column) => {
+		if (!col.pk) {
+			topList[col.index] = col;
+		}
+	});
+
+	const pushList = (list: Array<Column>) => {
+		each(list, (col: Column) => {
+			if (!isValidArray(col.children)) {
+				columnList.push(col);
+				return;
+			}
+			pushList(col.children);
+		});
+	};
+	pushList(topList);
+
+	// ²åÈë³£¹æµÄTR
+	const installNormal = (trObject: TrObject, row: Row, rowIndex: number, isTop: boolean): void => {
+		// Óëµ±Ç°Î»ÖÃĞÅÏ¢Æ¥ÅäµÄtdÁĞ±í
+
+		const tdList = trObject.tdList;
+		each(columnList, (col: Column) => {
+			const tdTemplate = col.template;
+			if (col.isAutoCreate) {
+				tdList.push(tdTemplate(row[col.key], row, rowIndex, isTop));
+				return;
+			}
+
+			let { text, compileAttr } = compileTd(settings, tdTemplate, row, rowIndex, col.key);
+			const alignAttr = col.align ? `align=${col.align}` : '';
+			const moveRowAttr = supportMoveRow ? moveRow.addSign(col) : '';
+			const useRowCheckAttr = supportCheckbox ? checkbox.addSign(col) : '';
+			const fixedAttr = col.fixed ? `fixed=${col.fixed}` : '';
+			const colClassAttr = col.columnClass ? `class=${col.columnClass}` : '';
+			const tdNameAttr = `td-name="${col.key}"`;
+			text = isElement(text) ? text.outerHTML : text;
+			tdList.push(`<td ${tdNameAttr} ${compileAttr} ${alignAttr} ${moveRowAttr} ${useRowCheckAttr} ${fixedAttr} ${colClassAttr}>${text}</td>`);
+		});
+	};
+
+	try {
+		const installTr = (list: Array<Row>, level: number, pIndex?: string): void => {
+			const isTop = isUndefined(pIndex);
+			each(list, (row: Row, index: number) => {
+				const className = [];
+				const attribute = [];
+				const tdList: Array<string> = [];
+				const cacheKey = row[TR_CACHE_KEY];
+
+				// Ôö¼ÓĞĞ class name
+				if (row[ROW_CLASS_NAME]) {
+					className.push(row[ROW_CLASS_NAME]);
+				}
+
+				// ·Ç¶¥²ã
+				if (!isTop) {
+					attribute.push([TR_PARENT_KEY, pIndex]);
+					// ´¦ÀíÕ¹¿ª×´Ì¬: µ±Ç°´æÔÚtrÊ¹ÓÃtrµ±Ç°µÄ×´Ì¬£¬Èç²»´æÔÚÊ¹ÓÃtree configÖĞµÄÅäÖÃÏî
+					const _tr = tbody.querySelector(`[${TR_CACHE_KEY}="${cacheKey}"]`);
+					let _openState = openState;
+					if (_tr) {
+						_openState = _tr.getAttribute(TR_CHILDREN_STATE) === 'true';
+					}
+					attribute.push([TR_CHILDREN_STATE, _openState]);
+				}
+
+				// ¶¥²ã ÇÒµ±Ç°ÎªÊ÷ĞÎ½á¹¹
+				if (isTop && supportTreeData) {
+					// ²»Ö±½ÓÊ¹ÓÃcss oddÊÇÓÉÓÚ´æÔÚ²ã¼¶Êı¾İÊ±ÎŞ·¨ÅÅ³ıÕÛµşÔªËØ
+					index % 2 === 0 && attribute.push([ODD, '']);
+				}
+
+				attribute.push([TR_CACHE_KEY, cacheKey]);
+
+				const trObject: TrObject = {
+					className,
+					attribute,
+					row,
+					querySelector: `[${TR_CACHE_KEY}="${cacheKey}"]`,
+					tdList
+				};
+
+				// ¶¥²ã½á¹¹: Í¨À¸-top
+				if (isTop && __isFullColumn) {
+					fullColumn.addTop(settings, row, index, trObjectList);
+				}
+
+				// ²åÈëÕı³£µÄTR
+				installNormal(trObject, row, index, isTop);
+
+				trObjectList.push(trObject);
+
+				// ¶¥²ã½á¹¹: Í¨À¸-bottom
+				if (isTop && __isFullColumn) {
+					fullColumn.addBottom(settings, row, index, trObjectList);
+				}
+
+				// ´¦Àí²ã¼¶½á¹¹
+				if (supportTreeData) {
+					const children = row[treeKey];
+					const hasChildren = children && children.length;
+
+					// µ±Ç°Îª¸üĞÂÊ±£¬±£ÁôÔ­×´Ì¬
+					let state;
+					const $treeElement = $tbody.find(`${trObject.querySelector} [${treeElementKey}]`);
+					if ($treeElement.length) {
+						state = $treeElement.attr(treeElementKey) === 'true';
+					}
+
+					// Ìí¼Ótree map
+					tree.add(_, cacheKey, level, hasChildren, state);
+
+					// µİ¹é´¦Àí²ã¼«½á¹¹
+					if (hasChildren) {
+						installTr(children, level + 1, cacheKey);
+					}
+				}
+			});
+		};
+
+		installTr(bodyList, 0);
+
+		// ²åÈë»ã×ÜĞĞ: ÑéÖ¤ÔÚº¯ÊıÄÚ
+		installSummary(settings, columnList, trObjectList);
+
+		const prependFragment = document.createDocumentFragment();
+
+		const df = document.createDocumentFragment();
+		const $tr = $tbody.find('tr');
+		each($tr, (item: HTMLTableRowElement) => {
+			df.appendChild(item);
+		});
+		tbody.innerHTML = '';
+
+		// Çå³ıÓëÊı¾İ²»Æ¥ÅäµÄtr
+		if (df.children.length) {
+			let firstLineIndex: number;
+			let lastLineIndex: number;
+
+			// ´¦Àí¿ªÊ¼ĞĞ: ĞèÒªÑéÖ¤ÉÏÍ¨À¸ĞĞ
+			let firstTr = getFullColumnTr(df, 'top', firstTrCacheKey);
+			if (!firstTr) {
+				firstTr = df.querySelector(`[${TR_CACHE_KEY}="${firstTrCacheKey}"]`);
+			}
+			if (firstTr) {
+				firstLineIndex = [].indexOf.call(df.children, firstTr);
+			}
+
+			// ´¦Àí½áÊøĞĞ: ĞèÒªÑéÖ¤·Ö¸îĞĞ
+			let lastTr = getFullColumnInterval(df, lastTrCacheKey);
+			if (!lastTr) {
+				lastTr = df.querySelector(`[${TR_CACHE_KEY}="${lastTrCacheKey}"]`);
+			}
+			if (lastTr) {
+				lastLineIndex = [].indexOf.call(df.children, lastTr);
+			}
+
+			const list: Array<HTMLTableRowElement> = [];
+			each(df.children, (item: HTMLTableRowElement, index: number) => {
+				// DOMÖĞ²»´æÔÚ¿ªÊ¼ĞĞÓë½áÊøĞĞµÄtr: Çå¿ÕËùÓĞtr
+				if (!isNumber(firstLineIndex) && !isNumber(lastLineIndex)) {
+					list.push(item);
+					return;
+				}
+
+				// DOMÖĞ´æÔÚ¿ªÊ¼ĞĞµÄtr: Çå¿ÕĞ¡ÓÚ¿ªÊ¼µÄtr
+				if (isNumber(firstLineIndex) && index < firstLineIndex) {
+					list.push(item);
+				}
+
+				// DOMÖĞ´æÔÚ½áÊøĞĞµÄtr: Çå¿Õ´óÓÚ½áÊøĞĞµÄtr
+				if (isNumber(lastLineIndex) && index > lastLineIndex) {
+					list.push(item);
+				}
+			});
+			each(list, (item: HTMLTableRowElement) => item.remove());
+		}
+		trObjectList.forEach(item => {
+			const { className, attribute, tdList, row, querySelector } = item;
+			const tdStr = tdList.join('');
+
+			// ²îÒì»¯¸üĞÂ
+			// Í¨¹ıdom½ÚµãÉÏµÄÊôĞÔ·´²édom
+			let tr = df.querySelector(querySelector);
+
+			// µ±Ç°ÒÑ´æÔÚtr
+			if (tr) {
+				tr.innerHTML = tdStr;
+			} else {
+				// µ±Ç°²»´æÔÚtr
+				tr = document.createElement('tr');
+				tr.innerHTML = tdStr;
+
+				const firstCacheTr = df.querySelector(`[${TR_CACHE_KEY}]`) as HTMLTableRowElement;
+				if (firstCacheTr && !isUndefined(row)) {
+					const firstNum = getRowData(_, firstCacheTr, true)[ROW_INDEX_KEY];
+					const nowNum = row[ROW_INDEX_KEY];
+					if (nowNum < firstNum) {
+						prependFragment.appendChild(tr);
+					} else {
+						df.appendChild(tr);
+					}
+				} else {
+					df.appendChild(tr);
+				}
+			}
+
+			// ÎªĞÂÔö»òĞŞ¸ÄºóµÄTr¸üĞÂ[class, attribute]
+			if (className.length) {
+				tr.className = className.join(' ');
+			}
+			attribute.forEach(attr => {
+				tr.setAttribute(attr[0], attr[1]);
+			});
+			// ½«Êı¾İ¹ÒÔØÖÁDOM
+			tr[TR_ROW_KEY] = row;
+		});
+
+		df.insertBefore(prependFragment, df.firstChild);
+
+		tbody.appendChild(df);
+	} catch (e) {
+		outError('render tbody error');
+		console.error(e);
+	}
+
+	// ·Ç¶à²ãÇ¶Ì×³õÊ¼»¯ÏÔÊ¾×´Ì¬: ¶à²ãÇ¶Ì×²»Ö§³ÖÏÔÊ¾¡¢Òş²Ø²Ù×÷
+	if (!__isNested) {
+		each(columnMap, (key: string, col: Column) => {
+			setAreVisible(_, key, col.isShow);
+		});
+	}
+
+	// ½âÎö¿ò¼Ü
+	await sendCompile(settings);
+
+	// ²åÈëtree dom
+	supportTreeData && tree.insertDOM(_, treeConfig);
+
+	// ºÏ²¢µ¥Ôª¸ñ
+	mergeRow(_, columnMap);
+
+	// ĞéÄâ¹ö¶¯ÎŞĞèÖ´ĞĞÒÔºóÂß¼­
+	if (!isVirtualScroll) {
+		fixed.update(_);
+
+		// Ôö¼ÓtbodyÊÇ·ñÌî³äÂú±êÊ¶
+		if ($tbody.height() >= getDiv(_).height()) {
+			$tbody.attr('filled', '');
+		} else {
+			$tbody.removeAttr('filled');
+		}
+
+		// Îª×îºóÒ»ÁĞµÄth, tdÔö¼Ó±êÊ¶: Ç¶Ì×±íÍ·²»´¦Àí
+		if (!settings.__isNested) {
+			updateVisibleLast(_);
+		}
+	}
+
+};
