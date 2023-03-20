@@ -170,7 +170,7 @@ export const renderTbody = async (settings: SettingObj, bodyList: Array<Row>, is
 			const tdNameAttr = `td-name="${col.key}"`;
 			const colClassAttr = col.columnClass ? `class=${col.columnClass}` : '';
 			text = isElement(text) ? text.outerHTML : text;
-			tdList.push(`<td ${tdNameAttr} ${colClassAttr} ${compileAttr} ${alignAttr} ${moveRowAttr} ${useRowCheckAttr} ${fixedAttr}>${text}</td>`);
+			tdList.push(`<td ${tdNameAttr} ${compileAttr} ${alignAttr} ${moveRowAttr} ${useRowCheckAttr} ${fixedAttr} ${colClassAttr}>${text}</td>`);
 		});
 	};
 
