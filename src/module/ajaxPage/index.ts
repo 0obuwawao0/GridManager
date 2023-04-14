@@ -112,6 +112,20 @@ const resetPageInfo = ($footerToolbar: JTool, settings: SettingObj, pageData: Pa
 		$pageInfo.html(info);
 	}
 
+	// 拆分分页信息
+	const $pageShows = jTool('.page-shows', $footerToolbar);
+	if ($pageShows.length) {
+		const info = i18n(settings, 'this-page-shows', [fromNum, toNum]);
+		$pageShows.html(info);
+	}
+
+	// 拆分总条数
+	const $total = jTool('.total', $footerToolbar);
+	if ($total.length) {
+		const info = i18n(settings, 'total', [totalNum]);
+		$total.html(info);
+	}
+
 	// 更新实时更新数据: 当前页从多少条开始显示
 	const $beginNumber = jTool('[begin-number-info]', $footerToolbar);
 	if ($beginNumber.length) {
@@ -360,10 +374,12 @@ class AjaxPage {
 	 * @param params
 	 * @returns {}
 	 */
+
+
 	@parseTpl(ajaxPageTpl)
 	createHtml(params: CreateHtmlParams): string {
 		const { settings } = params;
-
+		console.log('ajaxPageTpl',settings)
 		// @ts-ignore
 		return {
 			gridManagerName: settings._,
@@ -374,6 +390,9 @@ class AjaxPage {
 			previousPageText: i18n(settings, 'previous-page'),
 			nextPageText: i18n(settings, 'next-page'),
 			lastPageText: i18n(settings, 'last-page'),
+			supportCheckbox: settings.supportCheckbox ? '' : 'none',
+			pageShows: i18n(settings, 'this-page-shows'),
+			total: i18n(settings, 'total'),
 			pageSizeOptionTpl: dropdown.createHtml(settings)
 		};
 	}
@@ -464,10 +483,15 @@ class AjaxPage {
 	 * @param _
 	 */
 	updateCheckedInfo(_: string): void {
+		console.log('getQuerySelector(_)',getQuerySelector(_));
 		const checkedInfo = jTool(`${getQuerySelector(_)} .toolbar-info.checked-info`);
+
+		console.log('checkedInfo',checkedInfo)
+
 		if (checkedInfo.length === 0) {
 			return;
 		}
+		console.log(getSettings(_));
 		checkedInfo.html(i18n(getSettings(_), 'checked-info', getCheckedData(_).length));
 	}
 

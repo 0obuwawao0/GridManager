@@ -1,7 +1,6 @@
 <div class="gm-toolbar" {{vm.keyName}}="{{vm.gridManagerName}}">
 	<!--刷新图标-->
 	<span class="refresh-action"><i class="gm-icon gm-icon-refresh"></i></span>
-
 	<!--跳转至-->
 	<div class="goto-page">
 		{{ vm.gotoFirstText }}
@@ -14,11 +13,15 @@
 		{{ vm.pageSizeOptionTpl }}
 	</div>
 
-	<!--选中信息-->
-	<div class="toolbar-info checked-info"></div>
+	<!--选中信息，直接根据选择框去掉-->
+	<div class="toolbar-info checked-info" style="display:{{ vm.supportCheckbox }}"></div>
 
 	<!--分页描述-->
 	<div class="toolbar-info page-info"></div>
+
+	<!--分页描述 或 独立的 分页范围信息 和 总条数  二选一-->
+<!--	<div class="toolbar-info page-shows"></div>-->
+<!--	<div class="toolbar-info total"></div>-->
 
 	<!--分页切换-->
 	<div class="pagination">

@@ -42,6 +42,20 @@ export default function () {
         'en-us': 'this page show {0}-{1}<span class="page-info-totals"> count {2}</span>'
     };
 
+	// 独立的分页范围
+	_this['this-page-shows'] = {
+		'zh-cn': '此页显示 {0}-{1}',
+		'zh-tw': '此頁顯示 {0}-{1}',
+		'en-us': 'this page show {0}-{1}'
+	};
+
+	// 独立的总条数
+	_this['total'] = {
+		'zh-cn': '<span class="page-info-totals"> 共{0}条</span>',
+		'zh-tw': '<span class="page-info-totals"> 共{0}條</span>',
+		'en-us': '<span class="page-info-totals"> count {0}</span>'
+	};
+
     _this['checked-info'] = {
         'zh-cn': '已选 {0} 条',
         'zh-tw': '已選 {0} 條',
