@@ -379,7 +379,6 @@ class AjaxPage {
 	@parseTpl(ajaxPageTpl)
 	createHtml(params: CreateHtmlParams): string {
 		const { settings } = params;
-		console.log('ajaxPageTpl',settings)
 		// @ts-ignore
 		return {
 			gridManagerName: settings._,
@@ -483,15 +482,10 @@ class AjaxPage {
 	 * @param _
 	 */
 	updateCheckedInfo(_: string): void {
-		console.log('getQuerySelector(_)',getQuerySelector(_));
 		const checkedInfo = jTool(`${getQuerySelector(_)} .toolbar-info.checked-info`);
-
-		console.log('checkedInfo',checkedInfo)
-
 		if (checkedInfo.length === 0) {
 			return;
 		}
-		console.log(getSettings(_));
 		checkedInfo.html(i18n(getSettings(_), 'checked-info', getCheckedData(_).length));
 	}
 

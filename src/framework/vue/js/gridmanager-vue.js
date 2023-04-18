@@ -242,9 +242,9 @@ export default {
 		 * @param callback: 回调函数
 		 */
 		refreshGrid(isGotoFirstPage = true, callback) {
-			const {checkboxConfig} = this.option;
-			if  (!checkboxConfig ||
-				checkboxConfig.disableStateKeep) {
+			const {checkboxConfig, supportCheckbox} = this.option;
+			if  (supportCheckbox &&
+				(!checkboxConfig || checkboxConfig.disableStateKeep)) {
 				this.setCheckedData([]);
 			}
 			$gridManager.refreshGrid(this.option.gridManagerName, isGotoFirstPage, callback);
