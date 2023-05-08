@@ -166,7 +166,8 @@ export default class GridManager {
 		// 当只设置一个空数组时转成默认格式
 		if (arg.ajaxData instanceof Array) {
 			arg.ajaxData = {
-				[arg.dataKey]: arg.ajaxData
+				[arg.dataKey]: arg.ajaxData,
+				[arg.totalsKey]: 0
 			};
 		}
 

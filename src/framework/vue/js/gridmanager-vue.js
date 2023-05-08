@@ -1,5 +1,6 @@
 import Vue from 'vue';
 import $gridManager, { jTool } from '../../../module/index';
+import {getSettings} from '@common/cache';
 export { $gridManager, jTool };
 export default {
     name: 'GridManagerVue',
@@ -229,11 +230,12 @@ export default {
 					[dataKey]: ajaxData
 				};
 			}
-			const {checkboxConfig} = this.option;
-			if  (!checkboxConfig ||
-				checkboxConfig.disableStateKeep) {
+			const {checkboxConfig, supportCheckbox} = getSettings(this.option.gridManagerName);
+			if  (supportCheckbox &&
+				(!checkboxConfig || checkboxConfig.disableStateKeep)) {
 				this.setCheckedData([]);
 			}
+
 			$gridManager.setAjaxData(this.option.gridManagerName, ajaxData, callback);
 		},
 		/**
@@ -242,7 +244,7 @@ export default {
 		 * @param callback: 回调函数
 		 */
 		refreshGrid(isGotoFirstPage = true, callback) {
-			const {checkboxConfig, supportCheckbox} = this.option;
+			const {checkboxConfig, supportCheckbox} = getSettings(this.option.gridManagerName);
 			if  (supportCheckbox &&
 				(!checkboxConfig || checkboxConfig.disableStateKeep)) {
 				this.setCheckedData([]);
@@ -318,9 +320,9 @@ export default {
 		 * @returns {*|void}
 		 */
 		cleanData() {
-			const {checkboxConfig} = this.option;
-			if  (!checkboxConfig ||
-			checkboxConfig.disableStateKeep) {
+			const {checkboxConfig, supportCheckbox} = getSettings(this.option.gridManagerName);
+			if  (supportCheckbox &&
+				(!checkboxConfig || checkboxConfig.disableStateKeep)) {
 				this.setCheckedData([]);
 			}
 			return $gridManager.cleanData(this.option.gridManagerName);
