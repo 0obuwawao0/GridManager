@@ -1,6 +1,7 @@
 import Vue from 'vue';
 import $gridManager, { jTool } from '../../../module/index';
 import {getSettings} from '@common/cache';
+
 export { $gridManager, jTool };
 export default {
     name: 'GridManagerVue',
