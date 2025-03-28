@@ -35,7 +35,6 @@ export interface Column {
 	remind?: string | object;
 	sorting?: string;
 	disableRowCheck?: boolean;
-	columnClass?: string;// 当前行所在列都给定样式名
 	pl?: number; // 仅在fixed中使用
 	pr?: number; // 仅在fixed中使用
 }
