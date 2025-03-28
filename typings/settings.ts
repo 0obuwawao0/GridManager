@@ -20,6 +20,7 @@ export interface Column {
 	__width?: number | undefined;
 	isShow?: boolean;
 	__isShow?: boolean;
+	columnClass?: string;
 	pk?: string;
 	children?: Array<Column>;
 	template?(cell: object, row: object, rowIndex: number, key: string | boolean): any; // 自动生成列没有key, 只有isTop
